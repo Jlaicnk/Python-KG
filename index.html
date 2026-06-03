@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Python 知识图谱</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="data.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f6fa; overflow: hidden; height: 100vh; }
+
+#toolbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+#toolbar h1 { font-size: 16px; font-weight: 600; color: #1a1a2e; white-space: nowrap; }
+#search { flex: 1; min-width: 120px; max-width: 300px; padding: 8px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; outline: none; -webkit-appearance: none; }
+#search:focus { border-color: #1565C0; }
+#legend { display: flex; gap: 12px; font-size: 12px; }
+.legend-item { display: flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+.legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+.legend-dot.chapter { background: #5470C6; }
+.legend-dot.section { background: #91CC75; }
+.legend-dot.point { background: #FAC858; }
+.toolbar-hint { font-size: 11px; color: #999; white-space: nowrap; }
+
+#main { position: fixed; top: 54px; left: 0; right: 0; bottom: 0; height: auto !important; }
+
+@media (max-width: 768px) {
+  #toolbar { padding: 6px 10px; gap: 6px; }
+  #toolbar h1 { font-size: 14px; }
+  #search { font-size: 14px; padding: 6px 12px; max-width: 200px; }
+  #legend { gap: 8px; font-size: 11px; }
+  .toolbar-hint { display: none; }
+  #main { top: 48px; }
+}
+#toolbar h1 { font-size: 18px; font-weight: 600; color: #1a1a2e; white-space: nowrap; }
+#search { flex: 1; max-width: 400px; padding: 8px 14px; border: 1px solid #ddd; border-radius: 20px; font-size: 14px; outline: none; }
+#search:focus { border-color: #1565C0; }
+#legend { display: flex; gap: 16px; font-size: 13px; }
+.legend-item { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.legend-dot { width: 14px; height: 14px; border-radius: 50%; }
+.legend-dot.chapter { background: #5470C6; }
+.legend-dot.section { background: #91CC75; }
+.legend-dot.point { background: #FAC858; }
+
+#main { position: fixed; top: 60px; left: 0; right: 0; bottom: 0; }
+
+.modal-overlay {
+  display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4); z-index: 200; justify-content: center; align-items: center;
+}
+.modal-overlay.active { display: flex; }
+.modal {
+  background: #fff; border-radius: 12px; padding: 24px; min-width: 320px; max-width: 500px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15); position: relative;
+}
+.modal h2 { font-size: 20px; margin-bottom: 16px; color: #1a1a2e; }
+.modal .row { display: flex; margin-bottom: 12px; }
+.modal .label { width: 60px; color: #999; font-size: 13px; flex-shrink: 0; }
+.modal .value { flex: 1; font-size: 14px; color: #333; }
+.modal .desc { background: #f8f9fa; padding: 12px; border-radius: 8px; font-size: 13px; line-height: 1.6; color: #555; margin-top: 8px; max-height: 200px; overflow-y: auto; }
+.modal .close-btn {
+  position: absolute; top: 12px; right: 16px;
+  width: 32px; height: 32px; border: none; background: #eee; border-radius: 50%;
+  font-size: 18px; cursor: pointer; color: #666; display: flex; align-items: center; justify-content: center;
+}
+.modal .close-btn:hover { background: #ddd; }
+
+.category-tag { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 12px; color: #fff; }
+.tag-0 { background: #5470C6; }
+.tag-1 { background: #91CC75; }
+.tag-2 { background: #FAC858; color: #333; }
+
+@media (max-width: 768px) {
+  #toolbar { flex-wrap: wrap; padding: 8px 12px; }
+  #toolbar h1 { font-size: 16px; }
+  #search { max-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <h1>Python 知识图谱</h1>
+  <input id="search" type="text" placeholder="搜索知识点..." oninput="doSearch(this.value)">
+  <div id="legend">
+    <div class="legend-item"><span class="legend-dot chapter"></span>章</div>
+    <div class="legend-item"><span class="legend-dot section"></span>节</div>
+    <div class="legend-item"><span class="legend-dot point"></span>知识点</div>
+  </div>
+  <span class="toolbar-hint">若图谱展示出现问题，请刷新浏览器</span>
+</div>
+
+<div id="main"></div>
+
+<div class="modal-overlay" id="nodeModal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+    <h2 id="modalTitle"></h2>
+    <div class="row"><span class="label">标签</span><span class="value" id="modalTag"></span></div>
+    <div class="row"><span class="label">名称</span><span class="value" id="modalName"></span></div>
+    <div class="desc" id="modalDesc"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="edgeModal">
+  <div class="modal">
+    <button class="close-btn" onclick="closeModal()">&times;</button>
+    <h2>关系详情</h2>
+    <div class="row"><span class="label">起点</span><span class="value" id="edgeSource"></span></div>
+    <div class="row"><span class="label">终点</span><span class="value" id="edgeTarget"></span></div>
+    <div class="row"><span class="label">关系</span><span class="value" id="edgeName"></span></div>
+  </div>
+</div>
+
+<script>
+var chart = null;
+var categories = [
+  { name: "章", itemStyle: { color: "#5470C6" } },
+  { name: "节", itemStyle: { color: "#91CC75" } },
+  { name: "知识点", itemStyle: { color: "#FAC858" } }
+];
+
+function init() {
+  chart = echarts.init(document.getElementById("main"));
+  buildFullData();
+  renderFull();
+
+  chart.on("click", function(params) {
+    if (params.dataType === "node") {
+      openNodeModal(params.data);
+    } else if (params.dataType === "edge") {
+      openEdgeModal(params.data);
+    }
+  });
+
+  window.addEventListener("resize", function() { chart.resize(); });
+}
+
+function buildFullData() {
+  // 构建完整数据集，确保 links 的 source/target 指向实际节点对象
+  var nodeMap = {};
+  graphData.nodes.forEach(function(n) {
+    nodeMap[n.name] = n;
+  });
+
+  // 只保留两端节点都存在的边
+  var validLinks = [];
+  graphData.links.forEach(function(l) {
+    if (nodeMap[l.source] && nodeMap[l.target]) {
+      validLinks.push({ source: l.source, target: l.target, name: l.name });
+    }
+  });
+
+  window._fullNodes = graphData.nodes.slice();
+  window._fullLinks = validLinks;
+}
+
+function renderFull() {
+  var option = {
+    tooltip: {
+      formatter: function(x) {
+        if (x.dataType === "node") return x.data.name;
+        if (x.dataType === "edge") return x.data.name || "关系";
+        return "";
+      }
+    },
+    legend: [{
+      data: categories.map(function(a) { return a.name; }),
+      orient: "vertical", left: 12, top: 12,
+      textStyle: { fontSize: 12 }
+    }],
+    series: [{
+      type: "graph",
+      layout: "force",
+      roam: true,
+      draggable: true,
+      force: {
+        repulsion: 1500,
+        edgeLength: [30, 200],
+        layoutAnimation: true,
+        friction: 0.6
+      },
+      data: window._fullNodes,
+      links: window._fullLinks,
+      categories: categories,
+      edgeSymbol: ["none", "arrow"],
+      edgeSymbolSize: [0, 6],
+      lineStyle: { width: 1, color: "#ccc", curveness: 0.1 },
+      emphasis: { focus: "adjacency", lineStyle: { width: 3, color: "#333" } },
+      label: { show: true, fontSize: 10, color: "#333" },
+      zoom: 0.25
+    }]
+  };
+
+  chart.setOption(option, true);
+}
+
+function doSearch(keyword) {
+  keyword = keyword.trim().toLowerCase();
+  if (!keyword) {
+    buildFullData();
+    renderFull();
+    return;
+  }
+
+  // 匹配节点
+  var matchedNames = new Set();
+  graphData.nodes.forEach(function(n) {
+    if (n.name.toLowerCase().indexOf(keyword) >= 0) {
+      matchedNames.add(n.name);
+    }
+  });
+
+  if (matchedNames.size === 0) {
+    // 找不到匹配，显示全部但高亮空
+    buildFullData();
+    renderFull();
+    return;
+  }
+
+  // 找相关节点（通过连边关联）
+  var relatedNames = new Set(matchedNames);
+  graphData.links.forEach(function(l) {
+    if (matchedNames.has(l.source) || matchedNames.has(l.target)) {
+      relatedNames.add(l.source);
+      relatedNames.add(l.target);
+    }
+  });
+
+  // 过滤节点
+  var filteredNodes = [];
+  graphData.nodes.forEach(function(n) {
+    if (relatedNames.has(n.name)) {
+      var node = Object.assign({}, n);
+      if (matchedNames.has(n.name)) {
+        node.itemStyle = { color: "#FF6B6B", borderColor: "#C0392B", borderWidth: 3 };
+      }
+      filteredNodes.push(node);
+    }
+  });
+
+  // 过滤边
+  var nodeNames = new Set(filteredNodes.map(function(n) { return n.name; }));
+  var filteredLinks = [];
+  graphData.links.forEach(function(l) {
+    if (nodeNames.has(l.source) && nodeNames.has(l.target)) {
+      filteredLinks.push({ source: l.source, target: l.target, name: l.name });
+    }
+  });
+
+  var nodeCount = filteredNodes.length;
+  var option = {
+    tooltip: {
+      formatter: function(x) {
+        if (x.dataType === "node") return x.data.name;
+        if (x.dataType === "edge") return x.data.name || "关系";
+        return "";
+      }
+    },
+    legend: [{
+      data: categories.map(function(a) { return a.name; }),
+      orient: "vertical", left: 12, top: 12,
+      textStyle: { fontSize: 12 }
+    }],
+    series: [{
+      type: "graph",
+      layout: "force",
+      roam: true,
+      draggable: true,
+      force: {
+        repulsion: 8000,
+        edgeLength: [200, 400],
+        gravity: 0.01,
+        layoutAnimation: false,
+        friction: 0.6
+      },
+      data: filteredNodes,
+      links: filteredLinks,
+      categories: categories,
+      edgeSymbol: ["none", "arrow"],
+      edgeSymbolSize: [0, 12],
+      lineStyle: { width: 2.5, color: "#555", curveness: 0.2 },
+      emphasis: { focus: "adjacency", lineStyle: { width: 3, color: "#333" } },
+      label: { show: true, fontSize: 13, color: "#333" },
+      zoom: 0.5
+    }]
+  };
+
+  chart.setOption(option, true);
+}
+
+function openNodeModal(node) {
+  document.getElementById("modalTitle").textContent = node.name;
+  var cats = ["章", "节", "知识点"];
+  var tag = cats[node.category] || "未知";
+  document.getElementById("modalTag").innerHTML = '<span class="category-tag tag-' + node.category + '">' + tag + '</span>';
+  document.getElementById("modalName").textContent = node.name;
+  document.getElementById("modalDesc").textContent = node.desc || "暂无描述";
+  document.getElementById("nodeModal").classList.add("active");
+}
+
+function openEdgeModal(edge) {
+  document.getElementById("edgeSource").textContent = edge.source;
+  document.getElementById("edgeTarget").textContent = edge.target;
+  document.getElementById("edgeName").textContent = edge.name || "未知关系";
+  document.getElementById("edgeModal").classList.add("active");
+}
+
+function closeModal() {
+  document.getElementById("nodeModal").classList.remove("active");
+  document.getElementById("edgeModal").classList.remove("active");
+}
+
+document.querySelectorAll(".modal-overlay").forEach(function(el) {
+  el.addEventListener("click", function(e) {
+    if (e.target === el) closeModal();
+  });
+});
+
+document.addEventListener("keydown", function(e) {
+  if (e.key === "Escape") closeModal();
+});
+
+init();
+</script>
+</body>
+</html>
