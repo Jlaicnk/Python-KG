@@ -118,7 +118,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
 <script>
 var chart = null;
-var isTouchDevice = ("ontouchstart" in window || navigator.maxTouchPoints > 0);
+function isMobileDevice() {
+  var ua = navigator.userAgent || navigator.vendor || window.opera;
+  var mobileRegex = /android|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile|windows phone|phone|webos|kindle|tablet/i;
+  return mobileRegex.test(ua.toLowerCase());
+}
 var categories = [
   { name: "章", itemStyle: { color: "#5470C6" } },
   { name: "节", itemStyle: { color: "#91CC75" } },
@@ -177,7 +181,7 @@ function renderFull() {
     series: [{
       type: "graph",
       layout: "force",
-      roam: isTouchDevice ? "scale" : true,
+      roam: true,
       draggable: true,
       force: {
         repulsion: 1500,
@@ -189,10 +193,10 @@ function renderFull() {
       links: window._fullLinks,
       categories: categories,
       edgeSymbol: ["none", "arrow"],
-      edgeSymbolSize: isTouchDevice ? [0, 10] : [0, 6],
-      lineStyle: { width: isTouchDevice ? 2.5 : 1, color: "#ccc", curveness: 0.1 },
+      edgeSymbolSize: isMobileDevice() ? [0, 10] : [0, 6],
+      lineStyle: { width: isMobileDevice() ? 2.5 : 1, color: "#ccc", curveness: 0.1 },
       emphasis: { focus: "adjacency", lineStyle: { width: 3, color: "#333" } },
-      label: { show: true, fontSize: isTouchDevice ? 13 : 10, color: "#333" },
+      label: { show: true, fontSize: isMobileDevice() ? 13 : 10, color: "#333" },
       zoom: 0.25
     }]
   };
@@ -270,7 +274,7 @@ function doSearch(keyword) {
     series: [{
       type: "graph",
       layout: "force",
-      roam: isTouchDevice ? "scale" : true,
+      roam: true,
       draggable: true,
       force: {
         repulsion: 3000,
@@ -283,10 +287,10 @@ function doSearch(keyword) {
       links: filteredLinks,
       categories: categories,
       edgeSymbol: ["none", "arrow"],
-      edgeSymbolSize: isTouchDevice ? [0, 16] : [0, 12],
-      lineStyle: { width: isTouchDevice ? 3 : 2.5, color: "#555", curveness: 0.2 },
+      edgeSymbolSize: isMobileDevice() ? [0, 16] : [0, 12],
+      lineStyle: { width: isMobileDevice() ? 3 : 2.5, color: "#555", curveness: 0.2 },
       emphasis: { focus: "adjacency", lineStyle: { width: 3, color: "#333" } },
-      label: { show: true, fontSize: isTouchDevice ? 15 : 13, color: "#333" },
+      label: { show: true, fontSize: isMobileDevice() ? 15 : 13, color: "#333" },
       zoom: 0.5
     }]
   };
